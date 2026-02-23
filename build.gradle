@@ -84,3 +84,28 @@ tasks.register('dockerDown', Exec) {
 	description = 'Stop and remove all Docker Compose services'
 	commandLine 'docker', 'compose', 'down', '-v'
 }
+
+// --- Docker Compose + Cucumber 통합 ---
+
+tasks.register('composeUp', Exec) {
+	description = 'Start PostgreSQL via Docker Compose'
+	commandLine 'docker', 'compose', 'up', '-d', '--wait'
+}
+
+tasks.register('composeDown', Exec) {
+	description = 'Stop and remove Docker Compose services'
+	commandLine 'docker', 'compose', 'down', '-v'
+}
+
+tasks.register('cucumberTest', Test) {
+	description = 'Run Cucumber tests against PostgreSQL (Docker Compose)'
+	group = 'verification'
+
+	useJUnitPlatform()
+
+	// Cucumber 테스트만 실행 (기존 RestAssured 테스트 제외)
+	include 'gift/cucumber/**'
+
+	dependsOn 'composeUp'
+	finalizedBy 'composeDown'
+}
