@@ -3,7 +3,7 @@ package gift.model;
 public class Gift {
     private final Long from;
     private final Long to;
-    private final Option option;
+    private final   Option option;
     private final int quantity;
     private final String message;
 

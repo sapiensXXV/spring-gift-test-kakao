@@ -1,6 +1,7 @@
 package gift;
 
 import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,6 +9,9 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.jdbc.Sql;
 
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductBehaviorTest {
@@ -23,43 +27,39 @@ class ProductBehaviorTest {
     /**
      * Behavior 4: 상품을 생성하면 조회 시 반환된다
      *
-     * [현재 행동 — DTO 바인딩 버그]
-     * CreateProductRequest에 setter가 없어 formParam 바인딩이 실패한다.
-     * categoryId가 null로 남아 findById(null) → IllegalArgumentException → HTTP 500.
-     * 상품이 생성되지 않으므로 조회 시 빈 목록이 반환된다.
-     *
      * Given: 카테고리(id=1)가 존재
-     * When:  POST /api/products (formParam: name, price, imageUrl, categoryId)
-     * Then:  HTTP 500 (DTO 바인딩 실패) / GET /api/products → 빈 목록
+     * When:  POST /api/products (JSON Body: name, price, imageUrl, categoryId)
+     * Then:  HTTP 200 + 상품 생성됨 / GET /api/products → 목록에 포함
      */
     @Test
     @Sql({"/sql/cleanup.sql", "/sql/product-setup.sql"})
-    void 상품_생성_시_DTO_바인딩_버그로_실패한다() {
-        // When & Then — 생성 실패 (DTO에 setter 없음 → categoryId=null → findById(null) 예외)
+    void 상품_생성하면_조회_시_반환된다() {
+        // When & Then — 생성 성공
         RestAssured.given()
-            .formParam("name", "테스트상품")
-            .formParam("price", 10000)
-            .formParam("imageUrl", "http://image.url")
-            .formParam("categoryId", 1)
+            .contentType(ContentType.JSON)
+            .body("{\"name\": \"테스트상품\", \"price\": 10000, \"imageUrl\": \"http://image.url\", \"categoryId\": 1}")
         .when()
             .post("/api/products")
         .then()
-            .statusCode(500);
+            .statusCode(200)
+            .body("id", notNullValue())
+            .body("name", equalTo("테스트상품"));
 
-        // Then — 후속 행동 검증: 상품이 생성되지 않았으므로 빈 목록
+        // Then — 후속 행동 검증: GET /api/products 에서 목록에 포함
         RestAssured.given()
         .when()
             .get("/api/products")
         .then()
             .statusCode(200)
-            .body("$", empty());
+            .body("$", hasSize(1))
+            .body("[0].name", equalTo("테스트상품"));
     }
 
     /**
      * Behavior 5: 존재하지 않는 카테고리로 상품 생성 시 실패한다
      *
      * Given: 카테고리가 존재하지 않음 (DB 비어 있음)
-     * When:  POST /api/products (formParam: name, price, imageUrl, categoryId=9999)
+     * When:  POST /api/products (JSON Body: name, price, imageUrl, categoryId=9999)
      * Then:  HTTP 500 / GET /api/products → 빈 목록 (상품 미생성)
      */
     @Test
@@ -67,10 +67,8 @@ class ProductBehaviorTest {
     void 상품_존재하지_않는_카테고리로_상품을_생성하면_실패한다() {
         // When & Then — 존재하지 않는 카테고리로 생성 실패
         RestAssured.given()
-            .formParam("name", "테스트상품")
-            .formParam("price", 10000)
-            .formParam("imageUrl", "http://image.url")
-            .formParam("categoryId", 9999)
+            .contentType(ContentType.JSON)
+            .body("{\"name\": \"테스트상품\", \"price\": 10000, \"imageUrl\": \"http://image.url\", \"categoryId\": 9999}")
         .when()
             .post("/api/products")
         .then()
